@@ -1,78 +1,84 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { User, AuthContextType } from '../types';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { AuthContextType, User } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEMO_USERS: { [key: string]: { password: string; user: User } } = {
-  'demo': {
-    password: 'demo',
-    user: {
-      id: 'user-1',
-      username: 'demo',
-      role: 'user',
-      name: 'Demo User',
-      email: 'demo@spiderbot.io',
-      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=demo',
-      kycStatus: 'Verified',
-      subscriptionPlan: 'Pro',
-      lastLogin: new Date().toISOString()
-    }
+const mockUsers = {
+  user: {
+    id: '1',
+    username: 'trader',
+    password: 'demo123',
+    role: 'user' as const,
+    name: 'John Trader',
+    email: 'trader@spiderbot.io',
+    avatarUrl: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100',
+    kycStatus: 'Verified' as const,
+    subscriptionPlan: 'Pro',
+    lastLogin: new Date().toISOString(),
   },
-  'admin': {
-    password: 'admin',
-    user: {
-      id: 'admin-1',
-      username: 'admin',
-      role: 'admin',
-      name: 'Admin User',
-      email: 'admin@spiderbot.io',
-      avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
-      kycStatus: 'Verified',
-      subscriptionPlan: 'Enterprise',
-      lastLogin: new Date().toISOString()
-    }
-  }
+  admin: {
+    id: '2',
+    username: 'admin',
+    password: 'admin123',
+    role: 'admin' as const,
+    name: 'Admin User',
+    email: 'admin@spiderbot.io',
+    avatarUrl: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=100',
+    kycStatus: 'Verified' as const,
+    subscriptionPlan: 'Enterprise',
+    lastLogin: new Date().toISOString(),
+  },
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
-    const userEntry = DEMO_USERS[username.toLowerCase()];
-    if (userEntry && userEntry.password === password) {
-      setUser(userEntry.user);
-      localStorage.setItem('spiderbot_user', JSON.stringify(userEntry.user));
-      return true;
-    }
-    return false;
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('spiderbot_user');
-  };
-
-  React.useEffect(() => {
-    const savedUser = localStorage.getItem('spiderbot_user');
-    if (savedUser) {
+  useEffect(() => {
+    const storedUser = localStorage.getItem('spiderbot_user');
+    if (storedUser) {
       try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
         localStorage.removeItem('spiderbot_user');
       }
     }
   }, []);
 
+  const login = async (username: string, password: string): Promise<boolean> => {
+    const userEntry = Object.values(mockUsers).find(
+      (u) => u.username === username && u.password === password
+    );
+
+    if (userEntry) {
+      const { password: _, ...userWithoutPassword } = userEntry;
+      setUser(userWithoutPassword);
+      setIsAuthenticated(true);
+      localStorage.setItem('spiderbot_user', JSON.stringify(userWithoutPassword));
+      return true;
+    }
+
+    return false;
+  };
+
+  const logout = () => {
+    setUser(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem('spiderbot_user');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
